@@ -16,13 +16,6 @@ A personality-based chatbot that doesn't require any external API. It uses patte
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the app: `streamlit run chatbot.py`
 
-## Deployment
-
-1. Create a GitHub repository with all files
-2. Sign up for Streamlit Community Cloud
-3. Connect your GitHub repository
-4. Deploy your app (no API keys needed!)
-
 ## How It Works
 
 This chatbot uses a rule-based system with:
