@@ -1,16 +1,8 @@
 import streamlit as st
-from openai import OpenAI
 import json
-import os
 import random
-from dotenv import load_dotenv
+import datetime
 from typing import Dict, List, Any
-
-# Load environment variables
-load_dotenv()
-
-# Initialize OpenAI client with API key from environment variable
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Load personality data
 def load_personalities():
@@ -20,7 +12,7 @@ def load_personalities():
 # Initialize the app
 def initialize_app():
     st.set_page_config(
-        page_title="Multi-Personality AI Chatbot",
+        page_title="Rule-Based Chatbot",
         page_icon="🤖",
         layout="wide"
     )
@@ -58,55 +50,47 @@ def get_pattern_response(tag: str, personality: Dict) -> str:
         return random.choice(personality["responses"][tag])
     return None
 
-# Get response from OpenAI using the new API
-def get_ai_response(messages: List[Dict], personality: Dict) -> str:
-    try:
-        # Prepare the message history with the system prompt
-        chat_messages = [
-            {"role": "system", "content": personality["system_prompt"]}
+# Get a contextual response based on message content
+def get_contextual_response(message: str, personality: Dict) -> str:
+    message_lower = message.lower()
+    
+    # Check for specific contextual patterns
+    if any(word in message_lower for word in ["weather", "rain", "sun", "temperature"]):
+        if personality["name"] == "Sarcastic Assistant":
+            return "Oh, you want a weather report? Sorry, I left my meteorology degree in my other server."
+        elif personality["name"] == "Professional Assistant":
+            return "I do not have access to real-time weather data. You might consult a dedicated weather service."
+        else:
+            return "I'm not connected to weather services, but I hope it's nice where you are!"
+    
+    elif any(word in message_lower for word in ["time", "date", "day", "year"]):
+        now = datetime.datetime.now()
+        if personality["name"] == "Sarcastic Assistant":
+            return f"It's {now.strftime('%H:%M')}. Do you have somewhere better to be?"
+        elif personality["name"] == "Professional Assistant":
+            return f"The current time is {now.strftime('%H:%M on %A, %B %d, %Y')}."
+        else:
+            return f"It's currently {now.strftime('%H:%M')} on this lovely day!"
+    
+    elif any(word in message_lower for word in ["joke", "funny", "laugh"]):
+        jokes = [
+            "Why don't scientists trust atoms? Because they make up everything!",
+            "Why did the scarecrow win an award? Because he was outstanding in his field!",
+            "What do you call a fake noodle? An impasta!",
+            "Why couldn't the bicycle stand up by itself? It was two tired!",
+            "What do you call a bear with no teeth? A gummy bear!"
         ]
-        
-        # Add conversation history
-        for msg in messages:
-            chat_messages.append(msg)
-        
-        # Create a completion using the chat model with the new API
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Using 3.5-turbo as it's more affordable
-            messages=chat_messages,
-            temperature=0.7,
-            max_tokens=500
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Sorry, I encountered an error: {str(e)}"
-
-# Function to test the API connection
-def test_api():
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": "Say 'API connection successful'"}],
-            max_tokens=10
-        )
-        return True, response.choices[0].message.content
-    except Exception as e:
-        return False, str(e)
+        return random.choice(jokes)
+    
+    # Default response based on personality
+    return personality["responses"]["default"][0]
 
 # Main app function
 def main():
     initialize_app()
     
-    # Test API connection (only once per session)
-    if "api_tested" not in st.session_state:
-        success, message = test_api()
-        if not success:
-            st.error(f"API Connection Failed: {message}")
-            st.stop()
-        st.session_state.api_tested = True
-    
-    st.title("🤖 Multi-Personality AI Chatbot")
-    st.markdown("Chat with different AI personalities!")
+    st.title("🤖 Rule-Based Chatbot")
+    st.markdown("Chat with different AI personalities - no API required!")
     
     # Sidebar for personality selection
     with st.sidebar:
@@ -134,24 +118,18 @@ def main():
         st.subheader("Current Personality")
         personality = st.session_state.personalities[st.session_state.personality]
         st.write(f"**Name:** {personality['name']}")
-        st.write(f"**Description:** {personality['system_prompt']}")
         
         # Clear chat button
         if st.button("Clear Chat"):
             st.session_state.messages = []
             st.rerun()
         
-        # API test button
-        if st.button("Test API Connection"):
-            success, message = test_api()
-            if success:
-                st.success(f"API Connection Successful: {message}")
-            else:
-                st.error(f"API Connection Failed: {message}")
-        
         st.markdown("---")
         st.markdown("### About")
-        st.markdown("This chatbot can respond with different personalities using both pattern matching and OpenAI's GPT model.")
+        st.markdown("This is a rule-based chatbot that doesn't require any API. It uses pattern matching and predefined responses.")
+        st.markdown("**Available Personalities:**")
+        for key, value in st.session_state.personalities.items():
+            st.markdown(f"- {value['name']}")
     
     # Display chat history
     for message in st.session_state.messages:
@@ -161,6 +139,7 @@ def main():
     # Display personality greeting if no messages yet
     if len(st.session_state.messages) == 0:
         with st.chat_message("assistant"):
+            personality = st.session_state.personalities[st.session_state.personality]
             st.markdown(personality["greeting"])
     
     # Chat input
@@ -188,15 +167,15 @@ def main():
                         st.markdown(pattern_response)
                         st.session_state.messages.append({"role": "assistant", "content": pattern_response})
                     else:
-                        # Fall back to AI if no pattern response available
-                        ai_response = get_ai_response(st.session_state.messages, personality)
-                        st.markdown(ai_response)
-                        st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                        # Fall back to contextual response if no pattern response available
+                        contextual_response = get_contextual_response(prompt, personality)
+                        st.markdown(contextual_response)
+                        st.session_state.messages.append({"role": "assistant", "content": contextual_response})
                 else:
-                    # Use AI for non-pattern messages
-                    ai_response = get_ai_response(st.session_state.messages, personality)
-                    st.markdown(ai_response)
-                    st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                    # Use contextual response for non-pattern messages
+                    contextual_response = get_contextual_response(prompt, personality)
+                    st.markdown(contextual_response)
+                    st.session_state.messages.append({"role": "assistant", "content": contextual_response})
 
 if __name__ == "__main__":
     main()
