@@ -1,5 +1,5 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import json
 import os
 import random
@@ -9,8 +9,8 @@ from typing import Dict, List, Any
 # Load environment variables
 load_dotenv()
 
-# Set up OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI client with API key from environment variable
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Load personality data
 def load_personalities():
@@ -58,7 +58,7 @@ def get_pattern_response(tag: str, personality: Dict) -> str:
         return random.choice(personality["responses"][tag])
     return None
 
-# Get response from OpenAI
+# Get response from OpenAI using the new API
 def get_ai_response(messages: List[Dict], personality: Dict) -> str:
     try:
         # Prepare the message history with the system prompt
@@ -70,20 +70,40 @@ def get_ai_response(messages: List[Dict], personality: Dict) -> str:
         for msg in messages:
             chat_messages.append(msg)
         
-        # Create a completion using the chat model
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        # Create a completion using the chat model with the new API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Using 3.5-turbo as it's more affordable
             messages=chat_messages,
             temperature=0.7,
             max_tokens=500
         )
-        return response.choices[0].message['content']
+        return response.choices[0].message.content
     except Exception as e:
         return f"Sorry, I encountered an error: {str(e)}"
+
+# Function to test the API connection
+def test_api():
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Say 'API connection successful'"}],
+            max_tokens=10
+        )
+        return True, response.choices[0].message.content
+    except Exception as e:
+        return False, str(e)
 
 # Main app function
 def main():
     initialize_app()
+    
+    # Test API connection (only once per session)
+    if "api_tested" not in st.session_state:
+        success, message = test_api()
+        if not success:
+            st.error(f"API Connection Failed: {message}")
+            st.stop()
+        st.session_state.api_tested = True
     
     st.title("🤖 Multi-Personality AI Chatbot")
     st.markdown("Chat with different AI personalities!")
@@ -120,6 +140,14 @@ def main():
         if st.button("Clear Chat"):
             st.session_state.messages = []
             st.rerun()
+        
+        # API test button
+        if st.button("Test API Connection"):
+            success, message = test_api()
+            if success:
+                st.success(f"API Connection Successful: {message}")
+            else:
+                st.error(f"API Connection Failed: {message}")
         
         st.markdown("---")
         st.markdown("### About")
