@@ -1,7 +1,7 @@
 # Rule-Based Chatbot
 
 A personality-based chatbot that doesn't require any external API. It uses pattern matching and predefined responses.
-
+https://chatbot-7lxtl5hc3u7qyqgmlappxny.streamlit.app/
 ## Features
 
 - Multiple AI personalities (Friendly, Professional, Sarcastic)
